@@ -4,7 +4,7 @@
 #*
 #* SPDX-License-Identifier: GPL-3
 #*/
-project('Cryptix-Template', ['c', 'cpp'],
+project('AwesomeShell', ['c', 'cpp'],
   version: 'v0.0.1', license: 'GPL-3.0',
   default_options: [
     'optimization=3',
@@ -40,6 +40,7 @@ add_global_arguments(cxx_args, language: 'cpp')
 
 srcs = files(
   'Source/main.cpp',
+  'Source/Lexer.cpp',
 )
 incs = include_directories(
   'Source',
@@ -57,10 +58,11 @@ endif
 
 deps = [
   dependency('prism'),
+  dependency('neon'),
 ]
 
 executable(
-  'Cryptix-Template', srcs,
+  'AwesomeShell', srcs,
   include_directories: incs, 
   link_args: ['-lsupc++', '-lgcc_s'], 
   dependencies: deps, install: true
