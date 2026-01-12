@@ -6,7 +6,7 @@
 #*/
 
 tests = [
-  'Example',
+  'Lexer',
 ]
 cpp_args = [
   '-Wno-unused-parameter',
@@ -25,7 +25,7 @@ endif
 
 foreach name : tests
   test = executable(
-    name, [files(name / 'main.cpp')],
+    name, [srcs, files(name / 'main.cpp')],
     cpp_args: cpp_args, link_args: link_args,
     include_directories: incs, dependencies: deps
   )

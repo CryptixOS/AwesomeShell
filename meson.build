@@ -41,6 +41,8 @@ cxx_args = [
 add_global_arguments(cxx_args, language: 'cpp')
 
 srcs = files(
+  'Source/Lexer.cpp',
+  # 'Source/Parser.cpp',
   'Source/Shell.cpp',
 )
 incs = include_directories(

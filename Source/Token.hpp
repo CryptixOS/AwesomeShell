@@ -7,7 +7,7 @@
 #pragma once
 
 #include <Prism/Core/Types.hpp>
-#include <Prism/String/StringView.hpp>
+#include <Prism/String/String.hpp>
 
 using namespace Prism;
 
@@ -46,15 +46,26 @@ enum class TokenType : isize
     eAmpersandPipe           = 30, // &|
     eSemiAmpersand           = 31, // ;&
     eSemiPipe                = 32, // ;|
-    eNewLine                 = 19, // \n
-    eAssign                  = 20, // =
-    eIdentifier              = 21,
-    eComment                 = 22,
-    eEndOfFile               = 23,
+    eNewLine                 = 33, // \n
+    eAssign                  = 34, // =
+    eIdentifier              = 35,
+    eComment                 = 36,
+    eEndOfFile               = 37,
+    eString                  = 38,
+    eVariable                = 39,
+    eCommandSubst            = 40,
+    eHereDoc                 = 41,
+    eArithmetic              = 42,
+    eKeyword                 = 43,
+    eBraceOpen               = 44, // {
+    eBraceClose              = 45, // }
+    eComma                   = 46, // ,
+    eGlobWord                = 47, // word containing *, ?, or [...]
 };
 
 struct Token
 {
-    TokenType  Type  = TokenType::eUnknown;
-    StringView Value = ""_sv;
+    TokenType Type;
+    String    Text;
+    usize     Offset;
 };
