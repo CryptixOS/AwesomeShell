@@ -35,12 +35,13 @@ cxx_args = [
   '-DFMT_USE_FLOAT=0',
   '-DFMT_USE_FLOAT128=0',
   '-DFMT_USE_EXCEPTIONS=0',
+  '-DPRISM_USE_NAMESPACE=1',
+  '-DPRISM_LOG_ENABLE=1',
 ]
 add_global_arguments(cxx_args, language: 'cpp')
 
 srcs = files(
-  'Source/main.cpp',
-  'Source/Lexer.cpp',
+  'Source/Shell.cpp',
 )
 incs = include_directories(
   'Source',
@@ -62,7 +63,7 @@ deps = [
 ]
 
 executable(
-  'AwesomeShell', srcs,
+  'AwesomeShell', [srcs, files('Source/main.cpp')],
   include_directories: incs, 
   link_args: ['-lsupc++', '-lgcc_s'], 
   dependencies: deps, install: true

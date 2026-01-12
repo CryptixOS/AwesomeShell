@@ -4,162 +4,165 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
-#include <cstdio>
-#include <pwd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/utsname.h>
-#include <sys/wait.h>
-#include <termios.h>
-#include <unistd.h>
-
-#include <Lexer.hpp>
+#include <Prism/Containers/Array.hpp>
 #include <Prism/Containers/Vector.hpp>
-#include <Prism/Core/Types.hpp>
-#include <Prism/String/String.hpp>
-#include <Prism/String/StringView.hpp>
+#include <Prism/Debug/Log.hpp>
+#include <Prism/String/StringBuilder.hpp>
+#include <Shell.hpp>
 
-uid_t       s_UserID    = -1;
-int         s_SessionID = -1;
-termios     s_Termios;
-const char* s_Cwd = "/";
+#include <getopt.h>
 
 using namespace Prism;
 
-extern "C"
+static i32    s_SavedArgc = 0;
+static char** s_SavedArgv = nullptr;
+
+void          help()
 {
-    void _Unwind_RaiseException() {}
-    void _Unwind_Resume_or_Rethrow() {}
-    void _Unwind_Resume() {}
-    void _Unwind_GetTextRelBase() {}
-    void _Unwind_SetGR() {}
-    void _Unwind_SetIP() {}
-    void _Unwind_GetRegionStart() {}
-    void _Unwind_GetLanguageSpecificData() {}
-    void _Unwind_GetDataRelBase() {}
-    void _Unwind_GetIPInfo() {}
-    void _Unwind_DeleteException() {}
+    printf("Usage: awsh [options] ...\n");
+    printf("       awsh [options] script-file ...\n");
+    printf("Options:\n");
+    printf("  -c, --command           Read commands from the command string\n");
+    printf("  -i, --interactive       Force interactive behavior\n");
+    printf("  -l, --login             Act as a login shell\n");
+    printf("  -r, --restricted        Run in restricted mode\n");
+    printf("  -p, --posix             Enable POSIX-compliant behavior\n");
+    printf(
+        "  -t, --test <argument>   Test command execution up to a given "
+        "stage\n");
+    printf("                     (lexer, parser, executor)\n");
+    printf("  -V, --verbose           Enable verbose output\n");
+    printf("  -v, --version           Display version information and exit\n");
+    printf("  -h, --help              Display this help message and exit\n");
 }
-
-void prompt()
+void printVersion()
 {
-    constexpr StringView p = "awsh>";
-
-    printf(p.Raw());
-    fflush(stdout);
-}
-
-static Vector<char> s_KeyBuffer;
-bool                readLine()
-{
-    s_KeyBuffer.Clear();
-    for (;;)
-    {
-        char    keybuf[16];
-        ssize_t nread = read(0, keybuf, sizeof(keybuf));
-        if (nread == 0) exit(0);
-
-        for (ssize_t i = 0; i < nread; ++i)
-        {
-            char ch = keybuf[i];
-            if (ch == 0) continue;
-            if (ch == '\n')
-            {
-                s_KeyBuffer.PushBack(0);
-                return true;
-            }
-
-            s_KeyBuffer.EmplaceBack(ch);
-        }
-    }
-    return 0;
-}
-
-Vector<char*> SplitArguments(StringView line)
-{
-    Vector<char*> args;
-    usize         start     = 0;
-    usize         end       = StringView::NPos;
-
-    auto          findSpace = [line](usize pos) -> usize
-    {
-        for (usize i = pos; i < line.Size(); i++)
-            if (line[i] == ' ') return i;
-        return StringView::NPos;
-    };
-
-    while ((end = findSpace(start)) != StringView::NPos)
-    {
-        usize length = end - start;
-        char* arg    = new char[length + 1];
-        std::memcpy(arg, line.Raw() + start, length);
-        arg[length] = 0;
-
-        start       = end + 1;
-        args.PushBack(arg);
-    }
-
-    // handle last segment
-    if (start < line.Size())
-    {
-        usize length = line.Size() - start;
-        char* arg    = new char[length + 1];
-        std::memcpy(arg, line.Raw() + start, length);
-        arg[length] = 0;
-
-        args.PushBack(arg);
-    }
-
-    args.PushBack(0);
-    return args;
-}
-
-void executeCommand(StringView line)
-{
-    printf("line: %s\n", line.Raw());
-    auto args = SplitArguments(line);
-    for (usize i = 0; const auto segment : args)
-        printf("%zu: '%s'\n", i++, segment ? segment : "(null)");
-
-    int pid = fork();
-    if (pid == -1)
-    {
-        perror("awsh: fork failed\n");
-        exit(-1);
-    }
-    else if (pid == 0) { execvp(args[0], (char**)args.Raw()); }
-
-    for (const auto& arg : args) delete[] arg;
-    int status;
-    waitpid(pid, &status, 0);
+    printf("awsh version 0.1.0\n");
+    printf("Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>\n");
 }
 
 ErrorOr<void> NeonMain(const Vector<StringView>& args,
                        const Vector<StringView>& envs)
 {
-    IgnoreUnused(envs);
-    Lexer lexer(const_cast<Vector<StringView>&>(args));
-    auto  tokens = PM_TryOrRet(lexer.Analyze());
+    auto options = Prism::ToArray<option>({
+        {"command", no_argument, nullptr, 'c'},
+        {"interactive", no_argument, nullptr, 'i'},
+        {"login", no_argument, nullptr, 'l'},
+        {"restricted", no_argument, nullptr, 'r'},
+        {"posix", no_argument, nullptr, 'p'},
+        {"test", required_argument, nullptr, 't'},
+        {"verbose", no_argument, nullptr, 'V'},
+        {"version", no_argument, nullptr, 'v'},
+        {"help", no_argument, nullptr, 'h'},
+    });
 
-    s_UserID     = getuid();
-    s_SessionID  = setsid();
-    tcsetpgrp(0, getpgrp());
-    tcgetattr(0, &s_Termios);
+    enum class RunMode
+    {
+        eSingleCommand = 1,
+        eScriptFile    = 2,
+        eInteractive   = 3,
+    } runMode
+        = RunMode::eScriptFile;
 
-    auto* cwd = getcwd(nullptr, 0);
-    s_Cwd     = cwd;
-    free(cwd);
-
+    usize modeSetCount = 0;
+    i32   optionIndex  = 0;
     for (;;)
     {
-        prompt();
-        if (!readLine()) continue;
-        StringView line(s_KeyBuffer.begin(), s_KeyBuffer.Size());
+        i32 c = getopt_long(s_SavedArgc, s_SavedArgv, "p:t:h", options.Raw(),
+                            &optionIndex);
+        if (c == -1) break;
+        switch (c)
+        {
+            case 'c':
+                runMode = RunMode::eSingleCommand;
+                ++modeSetCount;
+                break;
+            case 'i':
+                runMode = RunMode::eInteractive;
+                ++modeSetCount;
+                break;
+            case 'l': PrismToDoWarn(); break;
+            case 'r': Shell::EnableRestricted(); break;
+            case 'p': Shell::EnablePosixMode(); break;
+            case 't':
+            {
+                auto testModeString = optarg;
+                if (!optarg)
+                {
+                    PrismError("Test mode requires an argument");
+                    return Error(EINVAL);
+                }
+                auto testMode = Shell::TestMode::eNone;
+                if (testModeString == "lexer"_sv)
+                    testMode = Shell::TestMode::eLexer;
+                else if (testModeString == "parser"_sv)
+                    testMode = Shell::TestMode::eParser;
+                else if (testModeString == "executor"_sv)
+                    testMode = Shell::TestMode::eExecutor;
 
-        printf("%s\n", line.Raw());
-        executeCommand(line);
+                Shell::EnableTesting(testMode);
+                break;
+            }
+            case 'V': Shell::EnableVerbose(); break;
+            case 'v': printVersion(); return {};
+            case 'h': help(); return {};
+        }
     }
 
-    return {};
+    if (modeSetCount > 1)
+    {
+        PrismError("Only one of -c, -i, or script-file can be specified");
+        return Error(EINVAL);
+    }
+
+    if (optind < s_SavedArgc)
+    {
+        if (runMode == RunMode::eInteractive)
+        {
+            PrismError("Cannot specify both -i and a script file to execute");
+            return Error(EINVAL);
+        }
+        else if (runMode == RunMode::eSingleCommand)
+        {
+            StringBuilder builder;
+            for (isize i = optind; i < s_SavedArgc; i++)
+            {
+                if (i > optind) builder.Append(' ');
+                builder.Append(s_SavedArgv[i]);
+            }
+
+            return Shell::RunCommand(builder.ToString());
+        }
+
+        PathView path = args[optind];
+        if (optind + 1 < s_SavedArgc)
+            PrismWarn("Additional arguments to script file are ignored");
+        return Shell::RunFile(path);
+    }
+    else if ((runMode == RunMode::eSingleCommand
+              || runMode == RunMode::eScriptFile)
+             && modeSetCount)
+    {
+        PrismError("Mode was set to {} and no arguments were specified",
+                   StringUtils::ToString(runMode));
+        return Error(EINVAL);
+    }
+
+    Shell::Initialize(envs);
+    return Shell::Run();
+}
+i32 main(int argc, char** argv, char** envp)
+{
+    Vector<StringView> argArr;
+    Vector<StringView> envArr;
+
+    for (isize i = 0; i < argc && argv[i]; i++) argArr.EmplaceBack(argv[i]);
+    for (usize i = 0; envp[i]; i++) envArr.EmplaceBack(envp[i]);
+
+    s_SavedArgc = argc;
+    s_SavedArgv = argv;
+    auto status = NeonMain(argArr, envArr);
+    if (!status) return status.Error();
+
+    return 0;
 }
