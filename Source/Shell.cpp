@@ -4,12 +4,17 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Executor.hpp>
+#include <Lexer.hpp>
+#include <Lowerer.hpp>
+#include <Parser.hpp>
+
 #include <Prism/Debug/Log.hpp>
 #include <Prism/String/Formatter.hpp>
 #include <Prism/String/String.hpp>
 #include <Prism/String/StringBuilder.hpp>
-
 #include <Prism/Utility/Optional.hpp>
+
 #include <Shell.hpp>
 
 #include <sys/wait.h>
@@ -50,17 +55,19 @@ namespace Shell
             {
                 char  keybuf[16];
                 usize nread = read(0, keybuf, sizeof(keybuf));
-                if (nread == 0) exit(0);
+                if (nread == 0) std::exit(0);
 
                 for (usize i = 0; i < nread; ++i)
                 {
                     char ch = keybuf[i];
-                    if (ch == 0) continue;
-                    if (ch == '\n')
+                    if (ch == '\e')
                     {
-                        s_CommandLineBuilder << '\0';
-                        return s_CommandLineBuilder.ToString();
+                        if (i + 2 < nread && keybuf[i + 1] == '[')
+                            printf("Arrow key pressed => %c\n", keybuf[i + 2]);
                     }
+
+                    if (ch == 0) continue;
+                    if (ch == '\n') return s_CommandLineBuilder.ToString();
 
                     s_CommandLineBuilder << ch;
                 }
@@ -132,6 +139,7 @@ namespace Shell
 
             auto command = *result;
             Print(command);
+            Print("\n");
 
             auto status     = RunCommand(command);
             s_LastErrorCode = status ? 0 : status.Error();
@@ -145,34 +153,43 @@ namespace Shell
 
     ErrorOr<void> RunCommand(StringView line)
     {
-        Print(line);
-        auto args = line.Split(' ');
-        for (usize i = 0; const auto& segment : args)
-            PrismMessage("{}: {}\n", i++, segment.Raw() ? segment : "(null)");
+        Lexer lexer(line.Trim());
+        auto& tokens = lexer.Analyze();
 
-        Vector<const char*> argv;
-        argv.Reserve(args.Size() + 1);
-        for (StringView arg : args) argv.PushBack(arg.Raw());
-        argv.PushBack(0);
+        bool  exit   = false;
+        IgnoreUnused(exit);
+        if (line.StartsWith("exit")
+            && (line.Size() == 4 || IsSpace(line[4]) || line[4] == ';'))
+            exit = true;
 
-        i32 pid = fork();
-        if (pid == -1)
+        if (s_TestMode & TestMode::eLexer)
         {
-            perror("awsh: fork failed\n");
-            exit(1);
-        }
-        else if (pid == 0)
-        {
-            execvp(argv[0], const_cast<char* const*>(argv.Raw()));
-            PrismError("awsh: command not found: {}", argv[0]);
-            return Error(errno);
+            PrismTrace("Shell: Dumping tokens produced by lexer:");
+            for (const auto& token : tokens)
+                PrismMessage("Token: Type={}, Value='{}'\n",
+                             StringUtils::ToString(token.Type), token.Text);
+
+            if (!(s_TestMode & (TestMode::eParser | TestMode::eExecutor)))
+                return {};
         }
 
-        int wstatus = -1;
-        while (!WIFEXITED(wstatus)) waitpid(pid, &wstatus, 0);
+        Parser parser(tokens);
+        auto   ast = parser.Parse();
+        if (s_TestMode & TestMode::eParser)
+        {
+            ast->Print();
+            if (!(s_TestMode & TestMode::eExecutor)) return {};
+        }
 
-        int status = WEXITSTATUS(wstatus);
-        if (status) return Error(status);
+        Lowerer lowerer(ast);
+        PrismTrace("Shell: Lowering the ast into IR");
+        auto lowered = lowerer.Lower();
+        DumpProgram(lowered);
+        PrismInfo("Shell: Lowering complete");
+        Executor e(lowered);
+        PrismTrace("Shell: Executin IR");
+        e.Execute();
+        PrismInfo("Shell: Executing done");
 
         return {};
     }

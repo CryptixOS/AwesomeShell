@@ -16,11 +16,21 @@ namespace Shell
 {
     enum class TestMode
     {
-        eNone     = 0,
-        eLexer    = 1,
-        eParser   = 2,
-        eExecutor = 4,
+        eNone        = 0,
+        eLexer       = 1,
+        eParser      = 2,
+        eLexerParser = 3,
+        eExecutor    = 4,
+        eAll         = 7,
     };
+    inline constexpr TestMode operator|(const TestMode& lhs, const TestMode rhs)
+    {
+        return static_cast<TestMode>(ToUnderlying(lhs) | ToUnderlying(rhs));
+    }
+    inline constexpr bool operator&(const TestMode& lhs, const TestMode rhs)
+    {
+        return ToUnderlying(lhs) & ToUnderlying(rhs);
+    }
 
     void          Initialize(const Vector<StringView>& envp);
     ErrorOr<void> Run();

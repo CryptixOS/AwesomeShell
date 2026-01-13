@@ -37,12 +37,16 @@ cxx_args = [
   '-DFMT_USE_EXCEPTIONS=0',
   '-DPRISM_USE_NAMESPACE=1',
   '-DPRISM_LOG_ENABLE=1',
+  '-DPRISM_BUILD_DEBUG=1',
 ]
 add_global_arguments(cxx_args, language: 'cpp')
 
 srcs = files(
+  'Source/Executor.cpp',
+  'Source/Expander.cpp',
   'Source/Lexer.cpp',
-  # 'Source/Parser.cpp',
+  'Source/Lowerer.cpp',
+  'Source/Parser.cpp',
   'Source/Shell.cpp',
 )
 incs = include_directories(

@@ -44,6 +44,7 @@ void printVersion()
 ErrorOr<void> NeonMain(const Vector<StringView>& args,
                        const Vector<StringView>& envs)
 {
+    Shell::Initialize(envs);
     auto options = Prism::ToArray<option>({
         {"command", no_argument, nullptr, 'c'},
         {"interactive", no_argument, nullptr, 'i'},
@@ -68,8 +69,8 @@ ErrorOr<void> NeonMain(const Vector<StringView>& args,
     i32   optionIndex  = 0;
     for (;;)
     {
-        i32 c = getopt_long(s_SavedArgc, s_SavedArgv, "p:t:h", options.Raw(),
-                            &optionIndex);
+        i32 c = getopt_long(s_SavedArgc, s_SavedArgv, "c:i:l:r:p:t:V:v:h",
+                            options.Raw(), &optionIndex);
         if (c == -1) break;
         switch (c)
         {
@@ -95,10 +96,14 @@ ErrorOr<void> NeonMain(const Vector<StringView>& args,
                 auto testMode = Shell::TestMode::eNone;
                 if (testModeString == "lexer"_sv)
                     testMode = Shell::TestMode::eLexer;
-                else if (testModeString == "parser"_sv)
+                if (testModeString == "parser"_sv)
                     testMode = Shell::TestMode::eParser;
-                else if (testModeString == "executor"_sv)
+                if (testModeString == "lex-parse"_sv)
+                    testMode = Shell::TestMode::eLexerParser;
+                if (testModeString == "executor"_sv)
                     testMode = Shell::TestMode::eExecutor;
+                if (testModeString == "all"_sv)
+                    testMode = Shell::TestMode::eAll;
 
                 Shell::EnableTesting(testMode);
                 break;
@@ -148,7 +153,6 @@ ErrorOr<void> NeonMain(const Vector<StringView>& args,
         return Error(EINVAL);
     }
 
-    Shell::Initialize(envs);
     return Shell::Run();
 }
 i32 main(int argc, char** argv, char** envp)
