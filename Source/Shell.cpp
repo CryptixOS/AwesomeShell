@@ -42,7 +42,7 @@ namespace Shell
         void Print(StringView string) { PrismMessage("{}", string); }
         void Prompt()
         {
-            constexpr StringView prompt = "awsh>"_sv;
+            constexpr StringView prompt = "\e[31mawsh\e[0m>"_sv;
 
             Print(prompt);
             fflush(stdout);
@@ -182,14 +182,19 @@ namespace Shell
         }
 
         Lowerer lowerer(ast);
-        PrismTrace("Shell: Lowering the ast into IR");
+#define DebugTrace(...)                                                        \
+    if (s_TestMode & TestMode::eExecutor) { PrismTrace(__VA_ARGS__); }
+#define DebugInfo(...)                                                         \
+    if (s_TestMode & TestMode::eExecutor) { PrismInfo(__VA_ARGS__); }
+
+        DebugTrace("Shell: Lowering the ast into IR");
         auto lowered = lowerer.Lower();
-        DumpProgram(lowered);
-        PrismInfo("Shell: Lowering complete");
+        if (s_TestMode & TestMode::eExecutor) DumpProgram(lowered);
+        DebugInfo("Shell: Lowering complete");
         Executor e(lowered);
-        PrismTrace("Shell: Executin IR");
+        DebugTrace("Shell: Executin IR");
         e.Execute();
-        PrismInfo("Shell: Executing done");
+        DebugInfo("Shell: Executing done");
 
         return {};
     }

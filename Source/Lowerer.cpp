@@ -16,9 +16,9 @@ isize Lowerer::AddWord(Ref<Word> w)
     Program.WordTable.PushBack(w);
     return Program.WordTable.Size() - 1;
 }
-isize Lowerer::Emit(OpCode op, int arg0)
+isize Lowerer::Emit(OpCode op, int arg0, isize arg1)
 {
-    Program.Instructions.PushBack({op, arg0, -1, -1});
+    Program.Instructions.PushBack({op, arg0, arg1, -1});
     return Program.Instructions.Size() - 1;
 }
 
@@ -39,21 +39,35 @@ void Lowerer::LowerNode(Ref<ASTNode> node)
         auto c = node.template As<CommandNode>();
         auto w = CreateRef<Word>();
         for (auto& arg : c->Arguments)
+        {
             if (arg->Type == NodeType::eWord)
-                w->Atoms.PushBack(arg.template As<WordNode>()->Value);
+                w->Atoms.EmplaceBack(WordAtom::Type::eLiteral,
+                                     arg.template As<WordNode>()->Value);
+            else if (arg->Type == NodeType::eVariable)
+                w->Atoms.EmplaceBack(WordAtom::Type::eVariable,
+                                     arg.template As<VariableNode>()->Name);
+        }
+
         isize idx = AddWord(w);
         Emit(OpCode::eExpandWords, idx);
         Emit(OpCode::eExec, idx);
     }
     else if (node->Type == NodeType::eAssignment)
     {
-        auto assign = node.template As<AssignmentNode>();
-        auto w      = CreateRef<Word>();
+        auto assign   = node.template As<AssignmentNode>();
+        auto nameWord = CreateRef<Word>();
+        nameWord->Atoms.EmplaceBack(WordAtom::Type::eLiteral, assign->Variable);
+        isize nameIndex = AddWord(nameWord);
+
         if (assign->Value->Type == NodeType::eWord)
         {
-            w->Atoms.PushBack(assign->Value.template As<WordNode>()->Value);
-            isize idx = AddWord(w);
-            Emit(OpCode::eSetVar, idx);
+            auto valueWord = CreateRef<Word>();
+            valueWord->Atoms.EmplaceBack(
+                WordAtom::Type::eLiteral,
+                assign->Value.template As<WordNode>()->Value);
+
+            isize valueIndex = AddWord(valueWord);
+            Emit(OpCode::eSetVar, nameIndex, valueIndex);
         }
     }
     else if (node->Type == NodeType::eCondition)

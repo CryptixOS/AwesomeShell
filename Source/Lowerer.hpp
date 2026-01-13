@@ -14,6 +14,7 @@ enum class OpCode
 {
     eExpandWords, // expand a Word
     eExec,        // execute a command
+    eGetVar,
     eSetVar,
     eJumpIfNonZero,
     eJumpIfZero,
@@ -22,14 +23,24 @@ enum class OpCode
 struct Instruction
 {
     OpCode Op;
-    i32    Arg0 = -1; // index into WordTable
-    i32    Arg1 = -1;
+    isize  Arg0 = -1; // index into WordTable
+    isize  Arg1 = -1;
     i32    Payload;
 };
 
+struct WordAtom
+{
+    enum class Type
+    {
+        eLiteral,
+        eVariable,
+    } Type;
+
+    String Value;
+};
 struct Word : public RefCounted
 {
-    Vector<String> Atoms;
+    Vector<WordAtom> Atoms;
 };
 
 struct Program
@@ -46,7 +57,7 @@ struct Lowerer
     struct Program Program;
 
     isize          AddWord(Ref<Word> w);
-    isize          Emit(OpCode op, int arg0 = -1);
+    isize          Emit(OpCode op, int arg0 = -1, isize arg1 = -1);
 
     struct Program Lower();
     void           LowerNode(Ref<ASTNode> node);
@@ -57,7 +68,8 @@ constexpr void DumpProgram(const Program& prog)
     for (usize i = 0; i < prog.WordTable.Size(); i++)
     {
         fmt::print("[{}]: ", i);
-        for (auto& atom : prog.WordTable[i]->Atoms) fmt::print("{} ", atom);
+        for (auto& atom : prog.WordTable[i]->Atoms)
+            fmt::print("{} ", atom.Value);
         fmt::print("\n");
     }
 

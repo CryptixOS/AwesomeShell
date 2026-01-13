@@ -185,8 +185,10 @@ Token Lexer::LexDoubleQuoteString()
 
 Token Lexer::LexVariable()
 {
-    usize start = m_CurrentPos;
+    // Skip the $ part
     Advance();
+    usize start = m_CurrentPos;
+
     if (Peek() == '{')
     {
         Advance();

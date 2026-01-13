@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Environment.hpp>
 #include <Executor.hpp>
 #include <Prism/Debug/Log.hpp>
 
@@ -81,7 +82,7 @@ void Executor::HandleExpandWords(const Instruction& instr)
     {
         auto& word = m_Program.WordTable[instr.Arg0];
         fmt::print("Expanded: ");
-        for (auto& atom : word->Atoms) fmt::print("{} ", atom);
+        for (auto& atom : word->Atoms) fmt::print("{} ", atom.Value);
         fmt::print("\n");
     }
 }
@@ -91,7 +92,19 @@ void Executor::HandleExec(const Instruction& instr)
 
     // Convert Word.Atoms to char*[] for execvp
     Vector<char*> argv;
-    for (auto& atom : word->Atoms) argv.PushBack(const_cast<char*>(atom.Raw()));
+    for (auto& atom : word->Atoms)
+    {
+        if (atom.Type == WordAtom::Type::eLiteral)
+            argv.PushBack(const_cast<char*>(atom.Value.Raw()));
+        else if (atom.Type == WordAtom::Type::eVariable)
+        {
+            // TODO(v1tr10l7): Exit Code
+            if (atom.Value == "?"_sv)
+                ;
+            auto env = Environment::GetVariable(StringView(atom.Value));
+            argv.PushBack(const_cast<char*>(env.Raw()));
+        }
+    }
     argv.PushBack(nullptr);
 
     if (m_DebugLog) PrismTrace("Executor: Executing command => {}", argv[0]);
@@ -113,4 +126,12 @@ void Executor::HandleExec(const Instruction& instr)
     if (m_DebugLog)
         PrismTrace("Executor: Last Exit Status => {}", m_LastExitCode);
 }
-void Executor::HandleSetVar(const Instruction&) {}
+void Executor::HandleSetVar(const Instruction& instr)
+{
+    auto       nameWord  = m_Program.WordTable[instr.Arg0];
+    auto       valueWord = m_Program.WordTable[instr.Arg1];
+    StringView name      = nameWord->Atoms[0].Value;
+    StringView value     = valueWord->Atoms[0].Value;
+
+    Environment::SetVariable(name, value);
+}

@@ -42,6 +42,7 @@ cxx_args = [
 add_global_arguments(cxx_args, language: 'cpp')
 
 srcs = files(
+  'Source/Environment.cpp',
   'Source/Executor.cpp',
   'Source/Expander.cpp',
   'Source/Lexer.cpp',

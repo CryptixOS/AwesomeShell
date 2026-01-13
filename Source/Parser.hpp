@@ -25,7 +25,7 @@ class Parser
 
     Optional<Token&> Current()
     {
-        if (End()) return NullOpt;
+        if (m_Pos >= m_Tokens.Size()) return NullOpt;
         return m_Tokens[m_Pos];
     }
     Optional<Token&> Peek(usize offset = 1)
@@ -59,7 +59,7 @@ class Parser
     }
     inline bool Consume(TokenType type)
     {
-        if (End()) return false;
+        if (m_Pos >= m_Tokens.Size()) return false;
         if (Match(type))
         {
             Advance();

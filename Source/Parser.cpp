@@ -12,6 +12,7 @@ Ref<ASTNode> Parser::Parse()
     auto ast = ParseSequence();
     if (!End())
         PrismError("Parser: The are unconsumed tokens, which indicated error!");
+
     for (usize pos = m_Pos; pos < m_Tokens.Size(); pos++)
     {
         auto& token = m_Tokens[pos];
