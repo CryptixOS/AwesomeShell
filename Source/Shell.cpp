@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Builtins.hpp>
 #include <Executor.hpp>
 #include <Lexer.hpp>
 #include <Lowerer.hpp>
@@ -128,6 +129,8 @@ namespace Shell
         auto* cwd = getcwd(nullptr, 0);
         s_Cwd     = cwd;
         free(cwd);
+
+        Builtins::Initialize();
     }
     ErrorOr<void> Run()
     {

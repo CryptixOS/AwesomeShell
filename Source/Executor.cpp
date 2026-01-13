@@ -4,6 +4,7 @@
  *
  * SPDX-License-Identifier: GPL-3
  */
+#include <Builtins.hpp>
 #include <Environment.hpp>
 #include <Executor.hpp>
 #include <Prism/Debug/Log.hpp>
@@ -99,8 +100,8 @@ void Executor::HandleExec(const Instruction& instr)
         else if (atom.Type == WordAtom::Type::eVariable)
         {
             // TODO(v1tr10l7): Exit Code
-            if (atom.Value == "?"_sv)
-                ;
+            // if (atom.Value == "?"_sv)
+            //     ;
             auto env = Environment::GetVariable(StringView(atom.Value));
             argv.PushBack(const_cast<char*>(env.Raw()));
         }
@@ -110,6 +111,14 @@ void Executor::HandleExec(const Instruction& instr)
     if (m_DebugLog) PrismTrace("Executor: Executing command => {}", argv[0]);
     for (usize i = 0; m_DebugLog && i < argv.Size() - 1; i++)
         PrismMessage("argv[{}]: '{}'\n", i, argv[i]);
+
+    auto name   = argv[0];
+    auto status = Builtins::TryRun(name, argv);
+    if (status.HasValue())
+    {
+        m_LastExitCode = *status;
+        return;
+    }
 
     pid_t pid = fork();
     if (pid == 0)
