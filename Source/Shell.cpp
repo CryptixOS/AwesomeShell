@@ -38,7 +38,7 @@ namespace Shell
         String             s_Cwd = "/";
 
         Vector<StringView> s_Environment;
-        isize              s_LastErrorCode = 0;
+        isize              s_LastExitCode = 0;
 
         void Print(StringView string) { PrismMessage("{}", string); }
         void Prompt()
@@ -144,8 +144,8 @@ namespace Shell
             Print(command);
             Print("\n");
 
-            auto status     = RunCommand(command);
-            s_LastErrorCode = status ? 0 : status.Error();
+            auto status = RunCommand(command);
+            if (!status) PrismError("Shell: An unknown error has occurred");
         }
     }
 
@@ -194,9 +194,9 @@ namespace Shell
         auto lowered = lowerer.Lower();
         if (s_TestMode & TestMode::eExecutor) DumpProgram(lowered);
         DebugInfo("Shell: Lowering complete");
-        Executor e(lowered);
+        Executor e(lowered, s_LastExitCode);
         DebugTrace("Shell: Executin IR");
-        e.Execute();
+        s_LastExitCode = e.Execute();
         DebugInfo("Shell: Executing done");
 
         return {};

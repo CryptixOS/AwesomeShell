@@ -13,8 +13,9 @@
 
 using namespace Prism;
 
-Executor::Executor(Program& prog, bool debugLog)
+Executor::Executor(Program& prog, isize lastExitCode, bool debugLog)
     : m_Program(prog)
+    , m_LastExitCode(lastExitCode)
     , m_DebugLog(debugLog)
 {
 }
@@ -48,7 +49,7 @@ isize Executor::Execute()
         }
     }
 
-    return 0;
+    return m_LastExitCode;
 }
 isize Executor::Execute(StringView name, const Vector<String>& args)
 
@@ -99,10 +100,11 @@ void Executor::HandleExec(const Instruction& instr)
             argv.PushBack(const_cast<char*>(atom.Value.Raw()));
         else if (atom.Type == WordAtom::Type::eVariable)
         {
-            // TODO(v1tr10l7): Exit Code
-            // if (atom.Value == "?"_sv)
-            //     ;
-            auto env = Environment::GetVariable(StringView(atom.Value));
+            using namespace StringUtils;
+            auto envName = atom.Value;
+            String env = envName == "?"_sv
+                           ? ToString(m_LastExitCode)
+                           : String(Environment::GetVariable(envName));
             argv.PushBack(const_cast<char*>(env.Raw()));
         }
     }

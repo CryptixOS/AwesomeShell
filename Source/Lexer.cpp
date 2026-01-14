@@ -200,9 +200,10 @@ Token Lexer::LexVariable()
             ReportError(start, "Unterminated variable expansion");
         else Advance();
     }
-    else {
+    else if (Peek() == '?') Advance();
+    else
         while (StringUtils::IsAlphanumeric(Peek()) || Peek() == '_') Advance();
-    }
+
     return {TokenType::eVariable, m_Input.Substr(start, m_CurrentPos - start),
             start};
 }

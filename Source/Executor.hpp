@@ -12,7 +12,7 @@
 class Executor
 {
   public:
-    Executor(Program& program, bool debugLog = false);
+    Executor(Program& program, isize lastExitCode = 0, bool debugLog = false);
 
     isize Execute();
     isize Execute(StringView name, const Vector<String>& args);
