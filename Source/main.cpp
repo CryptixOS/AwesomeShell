@@ -9,6 +9,7 @@
 #include <Prism/Debug/Log.hpp>
 #include <Prism/String/StringBuilder.hpp>
 #include <Shell.hpp>
+#include <Version.hpp>
 
 #include <getopt.h>
 
@@ -37,8 +38,13 @@ void          help()
 }
 void printVersion()
 {
-    printf("awsh version 0.1.0\n");
-    printf("Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>\n");
+    PrismMessage(
+        "awsh version {}\n"
+        "built with {} {} on {} {}\n"
+        "tag: {}\n"
+        "Copyright (c) 2024-2025, Szymon Zemke <v1tr10l7@proton.me>\n",
+        g_Version, BUILD_COMPILER, BUILD_COMPILER_VERSION, AS_BUILD_DATE,
+        AS_BUILD_TIME, AS_BUILD_TAG);
 }
 
 ErrorOr<void> NeonMain(const Vector<StringView>& args,

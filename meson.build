@@ -5,7 +5,7 @@
 #* SPDX-License-Identifier: GPL-3
 #*/
 project('AwesomeShell', ['c', 'cpp'],
-  version: 'v0.0.1', license: 'GPL-3.0',
+  version: 'v0.2.0', license: 'GPL-3.0',
   default_options: [
     'optimization=3',
     'warning_level=2',
@@ -69,6 +69,24 @@ deps = [
   dependency('prism'),
   dependency('neon'),
 ]
+
+git_tag = run_command('git', 'rev-parse', 'HEAD').stdout().strip()
+
+version = meson.project_version().substring(1).split('.')
+versionConf = configuration_data()
+versionConf.set('AS_VERSION_MAJOR', version[0])
+versionConf.set('AS_VERSION_MINOR', version[1])
+versionConf.set('AS_VERSION_PATCH', version[2])
+versionConf.set('git_tag', git_tag)
+versionConf.set('compiler', cxx.get_id())
+versionConf.set('compiler_version', cxx.version())
+
+kernel_version_string_template = '@0@.@1@.@2@-@3@'
+
+configure_file(
+  input: 'Source/Version.hpp.in', 
+  output: 'Version.hpp',
+  configuration: versionConf)
 
 executable(
   'AwesomeShell', [srcs, files('Source/main.cpp')],
