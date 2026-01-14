@@ -195,7 +195,7 @@ namespace Shell
         if (s_TestMode & TestMode::eExecutor) DumpProgram(lowered);
         DebugInfo("Shell: Lowering complete");
         Executor e(lowered, s_LastExitCode);
-        DebugTrace("Shell: Executin IR");
+        DebugTrace("Shell: Executing IR");
         s_LastExitCode = e.Execute();
         DebugInfo("Shell: Executing done");
 
